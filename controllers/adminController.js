@@ -66,8 +66,16 @@ const rejectUser = async (req, res) => {
 
 const editUser = async (req, res) => {
   try {
-    const allowedFields = ['name', 'phone', 'email', 'photoUrl', 'licenseDetails', 'defaultLocation'];
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ msg: 'User not found' });
+
+    const allowedFields = ['name', 'email'];
     const updates = {};
+
+    // Allow drivers to edit licenseDetails
+    if (user.role === 'driver' && req.body.licenseDetails !== undefined) {
+      allowedFields.push('licenseDetails');
+    }
 
     allowedFields.forEach(field => {
       if (req.body[field] !== undefined) {
@@ -76,15 +84,37 @@ const editUser = async (req, res) => {
     });
 
     // Handle role changes separately
-    if (req.body.role && ['driver', 'valet_supervisor', 'parking_location_supervisor'].includes(req.body.role)) {
+    if (req.body.role && ['admin', 'driver', 'valet_supervisor', 'parking_location_supervisor'].includes(req.body.role)) {
       updates.role = req.body.role;
     }
 
-    const user = await User.findByIdAndUpdate(req.params.id, updates, { new: true });
-    if (!user) return res.status(404).json({ msg: 'User not found' });
+    // Check for email uniqueness if email is being updated
+    if (updates.email) {
+      const existingUser = await User.findOne({
+        email: updates.email,
+        _id: { $ne: req.params.id } // Exclude current user
+      });
 
-    res.json(user);
+      if (existingUser) {
+        return res.status(400).json({
+          msg: `Email ${updates.email} is already registered to another user`
+        });
+      }
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(req.params.id, updates, { new: true });
+    if (!updatedUser) return res.status(404).json({ msg: 'User not found' });
+
+    res.json(updatedUser);
   } catch (err) {
+    // Handle duplicate key errors with better error messages
+    if (err.code === 11000) {
+      const field = Object.keys(err.keyValue)[0];
+      const value = err.keyValue[field];
+      return res.status(400).json({
+        msg: `${field} "${value}" is already registered to another user`
+      });
+    }
     res.status(500).json({ msg: err.message });
   }
 };
@@ -234,27 +264,146 @@ const getStatistics = async (req, res) => {
 
 const getComprehensiveHistory = async (req, res) => {
   try {
-    const { dateFrom, dateTo, type, action, userId, vehicleId } = req.query;
+    const {
+      dateFrom,
+      dateTo,
+      date, // Single date option
+      type,
+      action,
+      userId,
+      vehicleId,
+      searchBy, // 'vehicle' or 'driver'
+      searchValue, // vehicle number or driver mobile
+      page = 1,
+      limit = 20
+    } = req.query;
 
     let filter = {};
 
+    // Handle date filtering - either date range or single date
     if (dateFrom || dateTo) {
       filter.timestamp = {};
       if (dateFrom) filter.timestamp.$gte = new Date(dateFrom);
       if (dateTo) filter.timestamp.$lte = new Date(dateTo);
+    } else if (date) {
+      // Single date - get records for that specific date
+      const startDate = new Date(date);
+      const endDate = new Date(date);
+      endDate.setHours(23, 59, 59, 999);
+
+      filter.timestamp = {
+        $gte: startDate,
+        $lte: endDate
+      };
     }
 
     if (type) filter['details.requestType'] = type;
     if (action) filter.action = action;
-    if (userId) filter.ownerId = userId;
+    if (userId) filter.performedBy = userId;
     if (vehicleId) filter.vehicleId = vehicleId;
 
-    const history = await History.find(filter)
-      .populate('vehicleId ownerId parkDriverId pickupDriverId performedBy')
-      .sort({ timestamp: -1 })
-      .limit(1000); // Limit for performance
+    // Search functionality
+    if (searchBy && searchValue) {
+      if (searchBy === 'vehicle') {
+        // Search by vehicle number in details
+        filter['details.carNumber'] = { $regex: searchValue, $options: 'i' };
+      } else if (searchBy === 'driver') {
+        // Search by driver mobile number - need to populate and filter
+        // This will be handled in the aggregation pipeline
+      }
+    }
 
-    res.json(history);
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // For driver search, we need to use aggregation to filter after populate
+    if (searchBy === 'driver' && searchValue) {
+      const history = await History.aggregate([
+        {
+          $match: filter
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'performedBy',
+            foreignField: '_id',
+            as: 'performedByUser'
+          }
+        },
+        {
+          $lookup: {
+            from: 'vehicles',
+            localField: 'vehicleId',
+            foreignField: '_id',
+            as: 'vehicleInfo'
+          }
+        },
+        {
+          $match: {
+            'performedByUser.phone': { $regex: searchValue, $options: 'i' }
+          }
+        },
+        {
+          $sort: { timestamp: -1 }
+        },
+        {
+          $skip: skip
+        },
+        {
+          $limit: parseInt(limit)
+        }
+      ]);
+
+      const totalCount = await History.aggregate([
+        {
+          $match: filter
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'performedBy',
+            foreignField: '_id',
+            as: 'performedByUser'
+          }
+        },
+        {
+          $match: {
+            'performedByUser.phone': { $regex: searchValue, $options: 'i' }
+          }
+        },
+        {
+          $count: 'total'
+        }
+      ]);
+
+      res.json({
+        history,
+        pagination: {
+          currentPage: parseInt(page),
+          limit: parseInt(limit),
+          total: totalCount[0]?.total || 0,
+          pages: Math.ceil((totalCount[0]?.total || 0) / parseInt(limit))
+        }
+      });
+    } else {
+      // Regular query without driver search
+      const history = await History.find(filter)
+        .populate('vehicleId parkDriverId pickupDriverId performedBy')
+        .sort({ timestamp: -1 })
+        .skip(skip)
+        .limit(parseInt(limit));
+
+      const totalCount = await History.countDocuments(filter);
+
+      res.json({
+        history,
+        pagination: {
+          currentPage: parseInt(page),
+          limit: parseInt(limit),
+          total: totalCount,
+          pages: Math.ceil(totalCount / parseInt(limit))
+        }
+      });
+    }
   } catch (err) {
     res.status(500).json({ msg: err.message });
   }
@@ -275,7 +424,7 @@ const exportHistory = async (req, res) => {
     if (type) filter['details.requestType'] = type;
 
     const history = await History.find(filter)
-      .populate('vehicleId ownerId parkDriverId pickupDriverId performedBy')
+      .populate('vehicleId parkDriverId pickupDriverId performedBy')
       .sort({ timestamp: -1 });
 
     if (format === 'csv') {

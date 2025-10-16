@@ -50,7 +50,7 @@
           }
         },
         {
-          "name": "Login User",
+          "name": "Login User (Legacy)",
           "event": [
             {
               "listen": "test",
@@ -58,7 +58,9 @@
                 "exec": [
                   "if (pm.response.code === 200) {",
                   "    const response = pm.response.json();",
-                  "    pm.collectionVariables.set('jwt_token', response.token);",
+                  "    if (response.token) {",
+                  "        pm.collectionVariables.set('jwt_token', response.token);",
+                  "    }",
                   "}"
                 ]
               }
@@ -80,6 +82,63 @@
               "raw": "{{baseUrl}}/auth/login",
               "host": ["{{baseUrl}}"],
               "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Send OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+9999999993\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/send-otp",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "send-otp"]
+            }
+          }
+        },
+        {
+          "name": "Verify OTP",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.token) {",
+                  "        pm.collectionVariables.set('jwt_token', response.token);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+9999999993\",\n  \"otp\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-otp",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "verify-otp"]
             }
           }
         }
@@ -214,6 +273,134 @@
               "raw": "{{baseUrl}}/admin/system-health",
               "host": ["{{baseUrl}}"],
               "path": ["admin", "system-health"]
+            }
+          }
+        },
+        {
+          "name": "Reject User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/reject-user/:userId",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "reject-user", ":userId"],
+              "variable": [
+                {
+                  "key": "userId",
+                  "value": "USER_ID_HERE"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Edit User",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Name\",\n  \"phone\": \"+9999999994\",\n  \"email\": \"updated@example.com\",\n  \"role\": \"driver\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/edit-user/:userId",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "edit-user", ":userId"],
+              "variable": [
+                {
+                  "key": "userId",
+                  "value": "USER_ID_HERE"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Add Parking Location",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Downtown Parking\",\n  \"address\": \"123 Main St, Downtown\",\n  \"geolocation\": {\n    \"lat\": 40.7128,\n    \"lng\": -74.0060\n  },\n  \"capacity\": 100\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/add-parking-location",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "add-parking-location"]
+            }
+          }
+        },
+        {
+          "name": "Edit Parking Location",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Parking Location\",\n  \"address\": \"456 Updated St\",\n  \"capacity\": 150\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/edit-parking-location/:locationId",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "edit-parking-location", ":locationId"],
+              "variable": [
+                {
+                  "key": "locationId",
+                  "value": "LOCATION_ID_HERE"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Parking Location",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/delete-parking-location/:locationId",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "delete-parking-location", ":locationId"],
+              "variable": [
+                {
+                  "key": "locationId",
+                  "value": "LOCATION_ID_HERE"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Parking Locations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/parking-locations",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "parking-locations"]
             }
           }
         }

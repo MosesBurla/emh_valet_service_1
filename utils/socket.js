@@ -20,6 +20,11 @@ const initSocket = (server) => {
     socket.on('authenticate', async (data) => {
       try {
         const { userId, role } = data;
+        if (!userId || !role) {
+          socket.emit('authentication_error', { msg: 'Missing userId or role' });
+          return;
+        }
+
         connectedUsers.set(socket.id, { userId, role });
 
         // Join role-specific rooms
@@ -36,10 +41,21 @@ const initSocket = (server) => {
       }
     });
 
+    // Handle user_connected event from client
+    socket.on('user_connected', (data) => {
+      console.log('User connected event received:', data);
+      // You can add additional logic here if needed
+    });
+
     // Handle disconnect
-    socket.on('disconnect', () => {
+    socket.on('disconnect', (reason) => {
       connectedUsers.delete(socket.id);
-      console.log('User disconnected:', socket.id);
+      console.log('User disconnected:', socket.id, 'Reason:', reason);
+    });
+
+    // Handle connection errors
+    socket.on('error', (error) => {
+      console.error('Socket error:', error);
     });
   });
 
