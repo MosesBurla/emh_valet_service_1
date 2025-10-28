@@ -3,11 +3,24 @@ const Vehicle = require('../models/Vehicle');
 const History = require('../models/History');
 const ParkingLocation = require('../models/ParkingLocation');
 const { getIO, emitToRole, emitToRoles } = require('../utils/socket');
+const ApiResponse = require('../utils/responseHelper');
 
 const getIncomingRequests = async (req, res) => {
   try {
     const { type, location } = req.query;
 
+    // First, check if driver has any accepted requests
+    const acceptedRequest = await Request.findOne({
+      driverId: req.user.id,
+      status: 'accepted'
+    }).populate('vehicleId');
+
+    if (acceptedRequest) {
+      // Driver has an accepted request, return only that request
+      return ApiResponse.success([acceptedRequest], 'Accepted request retrieved successfully').send(res);
+    }
+
+    // Driver has no accepted requests, return all available incoming requests
     let filter = {
       status: 'pending',
       driverId: null
@@ -20,9 +33,9 @@ const getIncomingRequests = async (req, res) => {
       .populate('vehicleId')
       .sort({ createdAt: 1 }); // Oldest first
 
-    res.json(requests);
+    return ApiResponse.success(requests, 'Incoming requests retrieved successfully').send(res);
   } catch (err) {
-    res.status(500).json({ msg: err.message });
+    return ApiResponse.error('ServerError', err.message).send(res);
   }
 };
 
@@ -45,7 +58,7 @@ const acceptRequest = async (req, res) => {
     );
 
     if (!updatedRequest) {
-      return res.status(400).json({ msg: 'Request no longer available' });
+      return ApiResponse.conflict('Request no longer available').send(res);
     }
 
     // Update vehicle status
@@ -83,9 +96,9 @@ const acceptRequest = async (req, res) => {
       } : null
     });
 
-    res.json({ msg: 'Request accepted successfully', request: updatedRequest });
+    return ApiResponse.success({ request: updatedRequest }, 'Request accepted successfully').send(res);
   } catch (err) {
-    res.status(500).json({ msg: err.message });
+    return ApiResponse.error('ServerError', err.message).send(res);
   }
 };
 
@@ -93,11 +106,11 @@ const markParked = async (req, res) => {
   try {
     const request = await Request.findById(req.params.id);
     if (!request || request.driverId.toString() !== req.user.id) {
-      return res.status(400).json({ msg: 'Unauthorized to complete this request' });
+      return ApiResponse.forbidden('Unauthorized to complete this request').send(res);
     }
 
     if (request.type !== 'park') {
-      return res.status(400).json({ msg: 'This is not a park request' });
+      return ApiResponse.badRequest('This is not a park request').send(res);
     }
 
     // Update request status
@@ -144,9 +157,9 @@ const markParked = async (req, res) => {
       } : null
     });
 
-    res.json({ msg: 'Vehicle marked as parked', request, vehicle });
+    return ApiResponse.success({ request, vehicle }, 'Vehicle marked as parked').send(res);
   } catch (err) {
-    res.status(500).json({ msg: err.message });
+    return ApiResponse.error('ServerError', err.message).send(res);
   }
 };
 
@@ -154,11 +167,11 @@ const markHandedOver = async (req, res) => {
   try {
     const request = await Request.findById(req.params.id);
     if (!request || request.driverId?.toString() !== req.user.id) {
-      return res.status(400).json({ msg: 'Unauthorized to complete this request' });
+      return ApiResponse.forbidden('Unauthorized to complete this request').send(res);
     }
 
     if (request.type !== 'pickup') {
-      return res.status(400).json({ msg: 'This is not a pickup request' });
+      return ApiResponse.badRequest('This is not a pickup request').send(res);
     }
 
     // Update request status
@@ -196,9 +209,9 @@ const markHandedOver = async (req, res) => {
     // Broadcast completion
     getIO().emit('pickup-completed', { request, vehicle });
 
-    res.json({ msg: 'Vehicle handover completed', request, vehicle });
+    return ApiResponse.success({ request, vehicle }, 'Vehicle handover completed').send(res);
   } catch (err) {
-    res.status(500).json({ msg: err.message });
+    return ApiResponse.error('ServerError', err.message).send(res);
   }
 };
 
@@ -220,9 +233,9 @@ const getHistory = async (req, res) => {
       .populate('vehicleId createdBy')
       .sort({ createdAt: -1 });
 
-    res.json(history);
+    return ApiResponse.success(history, 'Driver history retrieved successfully').send(res);
   } catch (err) {
-    res.status(500).json({ msg: err.message });
+    return ApiResponse.error('ServerError', err.message).send(res);
   }
 };
 
@@ -244,9 +257,9 @@ const getTodayParkedVehicles = async (req, res) => {
 
     const vehicles = parkedRequests.map(request => request.vehicleId);
 
-    res.json(vehicles);
+    return ApiResponse.success(vehicles, 'Today\'s parked vehicles retrieved successfully').send(res);
   } catch (err) {
-    res.status(500).json({ msg: err.message });
+    return ApiResponse.error('ServerError', err.message).send(res);
   }
 };
 
@@ -296,7 +309,7 @@ const getDriverStats = async (req, res) => {
       createdAt: { $gte: todayStart, $lte: todayEnd }
     });
 
-    res.json({
+    const statsData = {
       totalRequests,
       completedRequests,
       parkRequests,
@@ -304,18 +317,20 @@ const getDriverStats = async (req, res) => {
       todayRequests,
       completionRate: totalRequests > 0 ? (completedRequests / totalRequests * 100).toFixed(2) : 0,
       period: dateFrom && dateTo ? { from: dateFrom, to: dateTo } : 'all_time'
-    });
+    };
+
+    return ApiResponse.success(statsData, 'Driver statistics retrieved successfully').send(res);
   } catch (err) {
-    res.status(500).json({ msg: err.message });
+    return ApiResponse.error('ServerError', err.message).send(res);
   }
 };
 
 const getParkingLocations = async (req, res) => {
   try {
     const locations = await ParkingLocation.find();
-    res.json(locations);
+    return ApiResponse.success(locations, 'Parking locations retrieved successfully').send(res);
   } catch (err) {
-    res.status(500).json({ msg: err.message });
+    return ApiResponse.error('ServerError', err.message).send(res);
   }
 };
 

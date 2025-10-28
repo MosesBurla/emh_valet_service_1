@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Valet Parking App API",
-    "description": "Complete API collection for Valet Parking Management System\n\n**Features:**\n• **OTP-Based Authentication**: Login with phone number and OTP (default: 123456) instead of password\n• **Manual Pickup Request Creation**: Valet supervisors can manually create pickup requests for parked vehicles\n• **Enhanced Driver Notifications**: Drivers receive real-time notifications for new pickup requests\n• **Race Condition Prevention**: Improved request acceptance to prevent conflicts when multiple drivers accept simultaneously",
+    "description": "Complete API collection for Valet Parking Management System",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -40,48 +40,12 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"John Doe\",\n  \"phone\": \"+9999999993\",\n  \"email\": \"john@example.com\",\n  \"role\": \"driver\"\n}"
+              "raw": "{\n  \"name\": \"John Doe\",\n  \"phone\": \"+9999999993\",\n  \"email\": \"john@example.com\",\n  \"role\": \"driver\",\n  \"password\": \"password123\",\n  \"licenseDetails\": {\n    \"licenseNumber\": \"DL123456\",\n    \"expiryDate\": \"2025-12-31\"\n  },\n  \"defaultLocation\": \"Downtown Parking\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/auth/register",
               "host": ["{{baseUrl}}"],
               "path": ["auth", "register"]
-            }
-          }
-        },
-        {
-          "name": "Login User (Legacy)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "if (pm.response.code === 200) {",
-                  "    const response = pm.response.json();",
-                  "    if (response.token) {",
-                  "        pm.collectionVariables.set('jwt_token', response.token);",
-                  "    }",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"phone\": \"+9999999993\",\n  \"otp\": \"123456\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/auth/login",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "login"]
             }
           }
         },
@@ -141,6 +105,69 @@
               "path": ["auth", "verify-otp"]
             }
           }
+        },
+        {
+          "name": "Login (Legacy)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+9999999993\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Forgot Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+9999999993\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/forgot-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "forgot-password"]
+            }
+          }
+        },
+        {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+9999999993\",\n  \"otp\": \"123456\",\n  \"password\": \"new_password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/reset-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "reset-password"]
+            }
+          }
         }
       ]
     },
@@ -153,9 +180,23 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/admin/pending-registrations",
+              "raw": "{{baseUrl}}/admin/pending-registrations?role=driver&dateFrom=2024-01-01&dateTo=2024-12-31",
               "host": ["{{baseUrl}}"],
-              "path": ["admin", "pending-registrations"]
+              "path": ["admin", "pending-registrations"],
+              "query": [
+                {
+                  "key": "role",
+                  "value": "driver"
+                },
+                {
+                  "key": "dateFrom",
+                  "value": "2024-01-01"
+                },
+                {
+                  "key": "dateTo",
+                  "value": "2024-12-31"
+                }
+              ]
             }
           }
         },
@@ -187,14 +228,69 @@
           }
         },
         {
+          "name": "Reject User",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/reject-user/:userId",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "reject-user", ":userId"],
+              "variable": [
+                {
+                  "key": "userId",
+                  "value": "USER_ID_HERE"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Edit User",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Name\",\n  \"email\": \"updated@example.com\",\n  \"role\": \"driver\",\n  \"licenseDetails\": {\n    \"licenseNumber\": \"DL789012\",\n    \"expiryDate\": \"2026-12-31\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/edit-user/:userId",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "edit-user", ":userId"],
+              "variable": [
+                {
+                  "key": "userId",
+                  "value": "USER_ID_HERE"
+                }
+              ]
+            }
+          }
+        },
+        {
           "name": "Get All Users",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/admin/get-all-users",
+              "raw": "{{baseUrl}}/admin/get-all-users?role=driver&status=approved",
               "host": ["{{baseUrl}}"],
-              "path": ["admin", "get-all-users"]
+              "path": ["admin", "get-all-users"],
+              "query": [
+                {
+                  "key": "role",
+                  "value": "driver"
+                },
+                {
+                  "key": "status",
+                  "value": "approved"
+                }
+              ]
             }
           }
         },
@@ -221,12 +317,12 @@
           }
         },
         {
-          "name": "Get System History",
+          "name": "Get Comprehensive History",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/admin/history?dateFrom=2024-01-01&dateTo=2024-12-31",
+              "raw": "{{baseUrl}}/admin/history?dateFrom=2024-01-01&dateTo=2024-12-31&type=park&action=completed&page=1&limit=20",
               "host": ["{{baseUrl}}"],
               "path": ["admin", "history"],
               "query": [
@@ -237,6 +333,22 @@
                 {
                   "key": "dateTo",
                   "value": "2024-12-31"
+                },
+                {
+                  "key": "type",
+                  "value": "park"
+                },
+                {
+                  "key": "action",
+                  "value": "completed"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
                 }
               ]
             }
@@ -248,7 +360,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/admin/export-history?format=csv&dateFrom=2024-01-01",
+              "raw": "{{baseUrl}}/admin/export-history?format=csv&dateFrom=2024-01-01&type=park",
               "host": ["{{baseUrl}}"],
               "path": ["admin", "export-history"],
               "query": [
@@ -259,6 +371,10 @@
                 {
                   "key": "dateFrom",
                   "value": "2024-01-01"
+                },
+                {
+                  "key": "type",
+                  "value": "park"
                 }
               ]
             }
@@ -277,52 +393,14 @@
           }
         },
         {
-          "name": "Reject User",
+          "name": "Get Parking Locations",
           "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
+            "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/admin/reject-user/:userId",
+              "raw": "{{baseUrl}}/admin/parking-locations",
               "host": ["{{baseUrl}}"],
-              "path": ["admin", "reject-user", ":userId"],
-              "variable": [
-                {
-                  "key": "userId",
-                  "value": "USER_ID_HERE"
-                }
-              ]
-            }
-          }
-        },
-        {
-          "name": "Edit User",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Updated Name\",\n  \"phone\": \"+9999999994\",\n  \"email\": \"updated@example.com\",\n  \"role\": \"driver\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/admin/edit-user/:userId",
-              "host": ["{{baseUrl}}"],
-              "path": ["admin", "edit-user", ":userId"],
-              "variable": [
-                {
-                  "key": "userId",
-                  "value": "USER_ID_HERE"
-                }
-              ]
+              "path": ["admin", "parking-locations"]
             }
           }
         },
@@ -391,18 +469,6 @@
               ]
             }
           }
-        },
-        {
-          "name": "Get Parking Locations",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/admin/parking-locations",
-              "host": ["{{baseUrl}}"],
-              "path": ["admin", "parking-locations"]
-            }
-          }
         }
       ]
     },
@@ -415,36 +481,21 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/driver/incoming-requests",
+              "raw": "{{baseUrl}}/driver/incoming-requests?type=park&location=Downtown",
               "host": ["{{baseUrl}}"],
-              "path": ["driver", "incoming-requests"]
-            }
-          },
-          "response": [
-            {
-              "name": "Success Response",
-              "originalRequest": {
-                "method": "GET",
-                "header": [],
-                "url": {
-                  "raw": "{{baseUrl}}/driver/incoming-requests",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["driver", "incoming-requests"]
-                }
-              },
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "header": [
+              "path": ["driver", "incoming-requests"],
+              "query": [
                 {
-                  "key": "Content-Type",
-                  "value": "application/json"
+                  "key": "type",
+                  "value": "park"
+                },
+                {
+                  "key": "location",
+                  "value": "Downtown"
                 }
-              ],
-              "cookie": [],
-              "body": "[\n  {\n    \"_id\": \"req_123\",\n    \"type\": \"park\",\n    \"status\": \"pending\",\n    \"vehicleId\": {\n      \"_id\": \"veh_123\",\n      \"number\": \"ABC123\",\n      \"make\": \"Toyota\",\n      \"model\": \"Camry\",\n      \"ownerName\": \"John Doe\"\n    },\n    \"createdAt\": \"2024-01-15T10:30:00Z\"\n  }\n]"
+              ]
             }
-          ]
+          }
         },
         {
           "name": "Accept Request",
@@ -480,37 +531,7 @@
                 }
               ]
             }
-          },
-          "response": [
-            {
-              "name": "Success Response",
-              "originalRequest": {
-                "method": "POST",
-                "header": [],
-                "url": {
-                  "raw": "{{baseUrl}}/driver/mark-parked/:requestId",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["driver", "mark-parked", ":requestId"],
-                  "variable": [
-                    {
-                      "key": "requestId"
-                    }
-                  ]
-                }
-              },
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n  \"msg\": \"Vehicle marked as parked\",\n  \"request\": {\n    \"_id\": \"req_123\",\n    \"type\": \"park\",\n    \"status\": \"completed\",\n    \"vehicleId\": \"veh_123\",\n    \"parkDriverId\": \"driver_123\"\n  },\n  \"vehicle\": {\n    \"_id\": \"veh_123\",\n    \"number\": \"ABC123\",\n    \"make\": \"Toyota\",\n    \"model\": \"Camry\",\n    \"ownerName\": \"John Doe\",\n    \"status\": \"parked\"\n  }\n}"
-            }
-          ]
+          }
         },
         {
           "name": "Mark Vehicle as Handed Over",
@@ -536,15 +557,35 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/driver/history?dateFrom=2024-01-01",
+              "raw": "{{baseUrl}}/driver/history?dateFrom=2024-01-01&dateTo=2024-12-31&type=park",
               "host": ["{{baseUrl}}"],
               "path": ["driver", "history"],
               "query": [
                 {
                   "key": "dateFrom",
                   "value": "2024-01-01"
+                },
+                {
+                  "key": "dateTo",
+                  "value": "2024-12-31"
+                },
+                {
+                  "key": "type",
+                  "value": "park"
                 }
               ]
+            }
+          }
+        },
+        {
+          "name": "Get Today Parked Vehicles",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/driver/today-parked-vehicles",
+              "host": ["{{baseUrl}}"],
+              "path": ["driver", "today-parked-vehicles"]
             }
           }
         },
@@ -554,9 +595,31 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/driver/stats",
+              "raw": "{{baseUrl}}/driver/stats?dateFrom=2024-01-01&dateTo=2024-12-31",
               "host": ["{{baseUrl}}"],
-              "path": ["driver", "stats"]
+              "path": ["driver", "stats"],
+              "query": [
+                {
+                  "key": "dateFrom",
+                  "value": "2024-01-01"
+                },
+                {
+                  "key": "dateTo",
+                  "value": "2024-12-31"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Parking Locations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/driver/parking-locations",
+              "host": ["{{baseUrl}}"],
+              "path": ["driver", "parking-locations"]
             }
           }
         }
@@ -577,7 +640,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"phoneNumber\": \"+1234567890\",\n  \"customerName\": \"Jane Smith\",\n  \"licensePlate\": \"XYZ789\",\n  \"make\": \"Honda\",\n  \"model\": \"Civic\",\n  \"color\": \"Red\"\n}"
+              "raw": "{\n  \"phoneNumber\": \"+1234567890\",\n  \"customerName\": \"Jane Smith\",\n  \"licensePlate\": \"XYZ789\",\n  \"make\": \"Honda\",\n  \"model\": \"Civic\",\n  \"color\": \"Red\",\n  \"locationFrom\": {\n    \"lat\": 40.7128,\n    \"lng\": -74.0060\n  },\n  \"notes\": \"Customer requested valet parking\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/supervisor/create-park-request",
@@ -605,64 +668,6 @@
               "host": ["{{baseUrl}}"],
               "path": ["supervisor", "create-pickup-request"]
             }
-          },
-          "response": [
-            {
-              "name": "Success Response",
-              "originalRequest": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"vehicleId\": \"VEHICLE_ID_HERE\",\n  \"locationFrom\": {\n    \"lat\": 40.7128,\n    \"lng\": -74.0060\n  },\n  \"notes\": \"Customer requested pickup for their parked vehicle\"\n}"
-                },
-                "url": {
-                  "raw": "{{baseUrl}}/supervisor/create-pickup-request",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["supervisor", "create-pickup-request"]
-                }
-              },
-              "status": "Created",
-              "code": 201,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n  \"msg\": \"Pickup request created successfully\",\n  \"pickupRequest\": {\n    \"_id\": \"pickup_123\",\n    \"type\": \"pickup\",\n    \"status\": \"pending\",\n    \"vehicleId\": \"veh_123\",\n    \"locationFrom\": {\n      \"lat\": 40.7128,\n      \"lng\": -74.0060\n    },\n    \"notes\": \"Customer requested pickup for their parked vehicle\",\n    \"createdAt\": \"2024-01-15T14:30:00Z\"\n  },\n  \"vehicle\": {\n    \"_id\": \"veh_123\",\n    \"number\": \"ABC123\",\n    \"make\": \"Toyota\",\n    \"model\": \"Camry\",\n    \"ownerName\": \"John Doe\",\n    \"status\": \"in-progress\"\n  }\n}"
-            }
-          ]
-        },
-        {
-          "name": "Get Parked Vehicles",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/supervisor/parked-vehicles",
-              "host": ["{{baseUrl}}"],
-              "path": ["supervisor", "parked-vehicles"]
-            }
-          }
-        },
-        {
-          "name": "Get Dashboard Statistics",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/supervisor/dashboard-stats",
-              "host": ["{{baseUrl}}"],
-              "path": ["supervisor", "dashboard-stats"]
-            }
           }
         }
       ]
@@ -682,7 +687,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"carNumber\": \"ABC123\"\n}"
+              "raw": "{\n  \"carNumber\": \"ABC123\",\n  \"ownerName\": \"John Doe\",\n  \"ownerPhone\": \"+1234567890\",\n  \"make\": \"Toyota\",\n  \"model\": \"Camry\",\n  \"color\": \"Blue\",\n  \"locationFrom\": {\n    \"lat\": 40.7128,\n    \"lng\": -74.0060\n  }\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/supervisor/verify-park-request",
@@ -706,6 +711,165 @@
                   "value": "VEHICLE_ID_HERE"
                 }
               ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Common Supervisor Operations",
+      "item": [
+        {
+          "name": "Get Parked Vehicles",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/supervisor/parked-vehicles?dateFrom=2024-01-01&dateTo=2024-12-31&status=parked",
+              "host": ["{{baseUrl}}"],
+              "path": ["supervisor", "parked-vehicles"],
+              "query": [
+                {
+                  "key": "dateFrom",
+                  "value": "2024-01-01"
+                },
+                {
+                  "key": "dateTo",
+                  "value": "2024-12-31"
+                },
+                {
+                  "key": "status",
+                  "value": "parked"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Today Parked Vehicles",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/supervisor/today-parked-vehicles",
+              "host": ["{{baseUrl}}"],
+              "path": ["supervisor", "today-parked-vehicles"]
+            }
+          }
+        },
+        {
+          "name": "Get Supervisor History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/supervisor/history?dateFrom=2024-01-01&dateTo=2024-12-31&type=park&action=completed",
+              "host": ["{{baseUrl}}"],
+              "path": ["supervisor", "history"],
+              "query": [
+                {
+                  "key": "dateFrom",
+                  "value": "2024-01-01"
+                },
+                {
+                  "key": "dateTo",
+                  "value": "2024-12-31"
+                },
+                {
+                  "key": "type",
+                  "value": "park"
+                },
+                {
+                  "key": "action",
+                  "value": "completed"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Dashboard Statistics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/supervisor/dashboard-stats?dateFrom=2024-01-01&dateTo=2024-12-31",
+              "host": ["{{baseUrl}}"],
+              "path": ["supervisor", "dashboard-stats"],
+              "query": [
+                {
+                  "key": "dateFrom",
+                  "value": "2024-01-01"
+                },
+                {
+                  "key": "dateTo",
+                  "value": "2024-12-31"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Common Operations",
+      "item": [
+        {
+          "name": "Get Parking Locations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/common/parking-locations",
+              "host": ["{{baseUrl}}"],
+              "path": ["common", "parking-locations"]
+            }
+          }
+        },
+        {
+          "name": "Search Vehicles",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/common/vehicles/search?q=ABC123",
+              "host": ["{{baseUrl}}"],
+              "path": ["common", "vehicles", "search"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "ABC123"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "System Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            }
+          }
+        },
+        {
+          "name": "Socket Test",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/socket-test",
+              "host": ["{{baseUrl}}"],
+              "path": ["socket-test"]
             }
           }
         }

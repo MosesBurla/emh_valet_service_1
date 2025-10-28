@@ -3,6 +3,7 @@ const Request = require('../models/Request');
 const History = require('../models/History');
 const User = require('../models/User');
 const { getIO, emitToRole, emitToRoles } = require('../utils/socket');
+const ApiResponse = require('../utils/responseHelper');
 
 // Valet Supervisor Functions
 const createPickupRequest = async (req, res) => {
@@ -12,11 +13,11 @@ const createPickupRequest = async (req, res) => {
     // Find the parked vehicle
     const vehicle = await Vehicle.findById(vehicleId);
     if (!vehicle) {
-      return res.status(404).json({ msg: 'Vehicle not found' });
+      return ApiResponse.notFound('Vehicle not found').send(res);
     }
 
     if (vehicle.status !== 'parked') {
-      return res.status(400).json({ msg: 'Vehicle must be parked to create pickup request' });
+      return ApiResponse.badRequest('Vehicle must be parked to create pickup request').send(res);
     }
 
     // Check if there's already a pending pickup request for this vehicle
@@ -27,7 +28,7 @@ const createPickupRequest = async (req, res) => {
     });
 
     if (existingPickupRequest) {
-      return res.status(400).json({ msg: 'Pickup request already exists for this vehicle' });
+      return ApiResponse.conflict('Pickup request already exists for this vehicle').send(res);
     }
 
     // Create pickup request
@@ -80,13 +81,12 @@ const createPickupRequest = async (req, res) => {
       location: locationFrom
     });
 
-    res.status(201).json({
-      msg: 'Pickup request created successfully',
+    return ApiResponse.created({
       pickupRequest,
       vehicle
-    });
+    }, 'Pickup request created successfully').send(res);
   } catch (err) {
-    res.status(500).json({ msg: err.message });
+    return ApiResponse.error('ServerError', err.message).send(res);
   }
 };
 
@@ -127,7 +127,7 @@ const createParkRequest = async (req, res) => {
     });
 
     if (existingRequest) {
-      return res.status(400).json({ msg: 'Park request already exists for this vehicle' });
+      return ApiResponse.badRequest(null, 'Park request already exists for this vehicle').send(res);
     }
 
     // Create new park request
@@ -175,9 +175,9 @@ const createParkRequest = async (req, res) => {
       }
     });
 
-    res.status(201).json({ request, vehicle });
+    return ApiResponse.created({ request, vehicle }, 'Park request created successfully').send(res);
   } catch (err) {
-    res.status(500).json({ msg: err.message });
+    return ApiResponse.error('ServerError', err.message).send(res);
   }
 };
 
@@ -225,7 +225,7 @@ const verifyParkRequest = async (req, res) => {
         await history.save();
 
         getIO().emit('vehicle-verified', { request, vehicle });
-        return res.json({ msg: 'Vehicle verified successfully', request, vehicle });
+        return ApiResponse.success({ request, vehicle }, 'Vehicle verified successfully').send(res);
       } else {
         // Vehicle exists but no completed park request found - create self-parked request
         const selfParkedRequest = new Request({
@@ -261,11 +261,10 @@ const verifyParkRequest = async (req, res) => {
         await history.save();
 
         getIO().emit('self-parked-created', { request: selfParkedRequest, vehicle });
-        return res.status(201).json({
-          msg: 'Self-parked request created for existing vehicle',
+        return ApiResponse.created({
           request: selfParkedRequest,
           vehicle
-        });
+        }, 'Self-parked request created for existing vehicle').send(res);
       }
     }
 
@@ -277,9 +276,7 @@ const verifyParkRequest = async (req, res) => {
     });
 
     if (existingSelfParkedRequest) {
-      return res.status(400).json({
-        msg: 'Self-parked vehicle with this car number already exists'
-      });
+      return ApiResponse.conflict('Self-parked vehicle with this car number already exists').send(res);
     }
 
     // If vehicle not found and no existing self-parked request, create self-parked entry
@@ -326,24 +323,23 @@ const verifyParkRequest = async (req, res) => {
       await history.save();
 
       getIO().emit('self-parked-created', { request: selfParkedRequest, vehicle: selfParkedVehicle });
-      res.status(201).json({ msg: 'Self-parked vehicle created', request: selfParkedRequest, vehicle: selfParkedVehicle });
+      return ApiResponse.created({
+        request: selfParkedRequest,
+        vehicle: selfParkedVehicle
+      }, 'Self-parked vehicle created').send(res);
 
     } catch (duplicateError) {
       if (duplicateError.code === 11000) {
-        return res.status(400).json({
-          msg: 'Vehicle with this car number already exists in the system'
-        });
+        return ApiResponse.conflict('Vehicle with this car number already exists in the system').send(res);
       }
       throw duplicateError;
     }
 
   } catch (err) {
     if (err.code === 11000) {
-      res.status(400).json({
-        msg: 'Vehicle with this car number already exists in the system'
-      });
+      return ApiResponse.conflict('Vehicle with this car number already exists in the system').send(res);
     } else {
-      res.status(500).json({ msg: err.message });
+      return ApiResponse.error('ServerError', err.message).send(res);
     }
   }
 };
@@ -353,10 +349,10 @@ const markSelfPickup = async (req, res) => {
 
   try {
     const vehicle = await Vehicle.findById(vehicleId);
-    if (!vehicle) return res.status(404).json({ msg: 'Vehicle not found' });
+    if (!vehicle) return ApiResponse.notFound('Vehicle not found').send(res);
 
     const request = await Request.findOne({ vehicleId: vehicle._id, status: 'verified' });
-    if (!request) return res.status(404).json({ msg: 'No verified request found for this vehicle' });
+    if (!request) return ApiResponse.notFound('No verified request found for this vehicle').send(res);
 
     // Mark as self-pickup
     request.status = 'self_pickup';
@@ -384,10 +380,10 @@ const markSelfPickup = async (req, res) => {
     await history.save();
 
     getIO().emit('self-pickup-marked', { request, vehicle });
-    res.json({ msg: 'Self-pickup marked successfully', request, vehicle });
+    return ApiResponse.success({ request, vehicle }, 'Self-pickup marked successfully').send(res);
 
   } catch (err) {
-    res.status(500).json({ msg: err.message });
+    return ApiResponse.error('ServerError', err.message).send(res);
   }
 };
 
@@ -405,9 +401,9 @@ const getParkedVehicles = async (req, res) => {
     }
 
     const parked = await Vehicle.find(filter).populate('verifiedBy createdBy');
-    res.json(parked);
+    return ApiResponse.success(parked, 'Parked vehicles retrieved successfully').send(res);
   } catch (err) {
-    res.status(500).json({ msg: err.message });
+    return ApiResponse.error('ServerError', err.message).send(res);
   }
 };
 
@@ -424,9 +420,9 @@ const getTodayParkedVehicles = async (req, res) => {
       createdAt: { $gte: startOfDay, $lte: endOfDay }
     }).populate('verifiedBy createdBy');
 
-    res.json(vehicles);
+    return ApiResponse.success(vehicles, 'Today\'s parked vehicles retrieved successfully').send(res);
   } catch (err) {
-    res.status(500).json({ msg: err.message });
+    return ApiResponse.error('ServerError', err.message).send(res);
   }
 };
 
@@ -447,9 +443,9 @@ const getHistory = async (req, res) => {
       .populate('vehicleId parkDriverId pickupDriverId performedBy')
       .sort({ timestamp: -1 });
 
-    res.json(history);
+    return ApiResponse.success(history, 'History retrieved successfully').send(res);
   } catch (err) {
-    res.status(500).json({ msg: err.message });
+    return ApiResponse.error('ServerError', err.message).send(res);
   }
 };
 
@@ -512,7 +508,7 @@ const getDashboardStats = async (req, res) => {
       { $sort: { _id: 1 } }
     ]);
 
-    res.json({
+    const statsData = {
       totalParked,
       totalRequests,
       totalVerified,
@@ -521,9 +517,11 @@ const getDashboardStats = async (req, res) => {
       usersByRole,
       dailyStats,
       period: dateFrom && dateTo ? { from: dateFrom, to: dateTo } : 'all_time'
-    });
+    };
+
+    return ApiResponse.success(statsData, 'Dashboard statistics retrieved successfully').send(res);
   } catch (err) {
-    res.status(500).json({ msg: err.message });
+    return ApiResponse.error('ServerError', err.message).send(res);
   }
 };
 

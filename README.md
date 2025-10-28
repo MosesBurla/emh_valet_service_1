@@ -28,6 +28,51 @@ A comprehensive valet parking management system designed for supervisors, admins
 - OTP verification support
 - Secure password hashing
 
+### 📋 **Standardized API Response Format**
+All API endpoints return responses in a consistent format:
+```json
+{
+  "success": true,
+  "data": null,
+  "message": "Success message",
+  "error": null,
+  "timestamp": "2024-01-01T00:00:00.000Z"
+}
+```
+
+**Success Response:**
+```json
+{
+  "success": true,
+  "data": { /* response data */ },
+  "message": "Operation completed successfully",
+  "error": null,
+  "timestamp": "2024-01-01T00:00:00.000Z"
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "data": null,
+  "message": "Error description",
+  "error": "ErrorType",
+  "timestamp": "2024-01-01T00:00:00.000Z"
+}
+```
+
+**Common HTTP Status Codes:**
+- `200`: Success
+- `201`: Created
+- `400`: Bad Request
+- `401`: Unauthorized
+- `403`: Forbidden
+- `404`: Not Found
+- `409`: Conflict
+- `422`: Validation Error
+- `500`: Server Error
+
 ## Setup
 
 ### Prerequisites

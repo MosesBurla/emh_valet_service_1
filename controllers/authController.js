@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const { sendOTP } = require('../utils/notifier');
+const ApiResponse = require('../utils/responseHelper');
 
 // Store OTPs temporarily (in production, use Redis or similar)
 const otpStore = new Map();
@@ -10,10 +11,7 @@ const register = async (req, res) => {
   try {
     let user = await User.findOne({ phone });
     if (user) {
-      return res.status(400).json({
-        success: false,
-        message: 'User already exists with this phone number'
-      });
+      return ApiResponse.conflict('User already exists with this phone number').send(res);
     }
 
     // Password is now optional since we use OTP for login
@@ -30,18 +28,13 @@ const register = async (req, res) => {
     console.log(`OTP for ${phone}: ${otp}`);
     // sendOTP(phone, otp); // Uncomment when SMS service is configured
 
-    res.status(201).json({
-      success: true,
-      message: 'Registration successful. Please verify your phone number with OTP.',
+    return ApiResponse.created({
       userId: user._id,
       requiresVerification: true
-    });
+    }, 'Registration successful. Please verify your phone number with OTP.').send(res);
   } catch (err) {
     console.error('Registration error:', err);
-    res.status(500).json({
-      success: false,
-      message: err.message || 'Registration failed'
-    });
+    return ApiResponse.error('ServerError', err.message || 'Registration failed').send(res);
   }
 };
 
@@ -49,19 +42,13 @@ const sendOtp = async (req, res) => {
   const { phone } = req.body;
   try {
     if (!phone) {
-      return res.status(400).json({
-        success: false,
-        message: 'Phone number is required'
-      });
+      return ApiResponse.badRequest('Phone number is required').send(res);
     }
 
     // Check if user exists
     const user = await User.findOne({ phone });
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found. Please register first.'
-      });
+      return ApiResponse.notFound('User not found. Please register first.').send(res);
     }
 
     // Generate OTP
@@ -72,17 +59,10 @@ const sendOtp = async (req, res) => {
     console.log(`OTP for ${phone}: ${otp}`);
     // sendOTP(phone, otp); // Uncomment when SMS service is configured
 
-    res.json({
-      success: true,
-      message: 'OTP sent successfully',
-      sessionInfo: 'otp_sent'
-    });
+    return ApiResponse.success({ sessionInfo: 'otp_sent' }, 'OTP sent successfully').send(res);
   } catch (err) {
     console.error('Send OTP error:', err);
-    res.status(500).json({
-      success: false,
-      message: err.message || 'Failed to send OTP'
-    });
+    return ApiResponse.error('ServerError', err.message || 'Failed to send OTP').send(res);
   }
 };
 
@@ -90,54 +70,36 @@ const verifyOtp = async (req, res) => {
   const { phone, otp } = req.body;
   try {
     if (!phone || !otp) {
-      return res.status(400).json({
-        success: false,
-        message: 'Phone number and OTP are required'
-      });
+      return ApiResponse.badRequest('Phone number and OTP are required').send(res);
     }
 
     // Check if user exists
     const user = await User.findOne({ phone });
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
+      return ApiResponse.notFound('User not found').send(res);
     }
 
     // Check if account is approved
     if (user.status !== 'approved') {
-      return res.status(403).json({
-        success: false,
-        message: 'Account pending approval'
-      });
+      return ApiResponse.forbidden('Account pending approval').send(res);
     }
 
     // Verify OTP
     const storedOtp = otpStore.get(phone);
     if (!storedOtp) {
-      return res.status(401).json({
-        success: false,
-        message: 'OTP expired or not found. Please request a new one.'
-      });
+      return ApiResponse.unauthorized('OTP expired or not found. Please request a new one.').send(res);
     }
 
     // Check if OTP is expired (5 minutes)
     const isExpired = Date.now() - storedOtp.timestamp > 5 * 60 * 1000;
     if (isExpired) {
       otpStore.delete(phone);
-      return res.status(401).json({
-        success: false,
-        message: 'OTP expired. Please request a new one.'
-      });
+      return ApiResponse.unauthorized('OTP expired. Please request a new one.').send(res);
     }
 
     // Check if OTP matches (default OTP is 123456 for development)
     if (otp !== '123456' && storedOtp.otp !== otp) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid OTP'
-      });
+      return ApiResponse.unauthorized('Invalid OTP').send(res);
     }
 
     // OTP verified successfully, remove from store
@@ -150,9 +112,7 @@ const verifyOtp = async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    res.json({
-      success: true,
-      message: 'Login successful',
+    return ApiResponse.success({
       token,
       user: {
         id: user._id,
@@ -163,13 +123,10 @@ const verifyOtp = async (req, res) => {
         rating: user.rating,
         status: user.status
       }
-    });
+    }, 'Login successful').send(res);
   } catch (err) {
     console.error('Verify OTP error:', err);
-    res.status(500).json({
-      success: false,
-      message: err.message || 'Verification failed'
-    });
+    return ApiResponse.error('ServerError', err.message || 'Verification failed').send(res);
   }
 };
 
@@ -177,25 +134,16 @@ const login = async (req, res) => {
   const { phone } = req.body;
   try {
     if (!phone) {
-      return res.status(400).json({
-        success: false,
-        message: 'Phone number is required'
-      });
+      return ApiResponse.badRequest('Phone number is required').send(res);
     }
 
     const user = await User.findOne({ phone });
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found. Please register first.'
-      });
+      return ApiResponse.notFound('User not found. Please register first.').send(res);
     }
 
     if (user.status !== 'approved') {
-      return res.status(403).json({
-        success: false,
-        message: 'Account pending approval'
-      });
+      return ApiResponse.forbidden('Account pending approval').send(res);
     }
 
     // Generate OTP for login
@@ -206,17 +154,10 @@ const login = async (req, res) => {
     console.log(`Login OTP for ${phone}: ${otp}`);
     // sendOTP(phone, otp); // Uncomment when SMS service is configured
 
-    res.json({
-      success: true,
-      message: 'OTP sent to your phone number',
-      requiresVerification: true
-    });
+    return ApiResponse.success({ requiresVerification: true }, 'OTP sent to your phone number').send(res);
   } catch (err) {
     console.error('Login error:', err);
-    res.status(500).json({
-      success: false,
-      message: err.message || 'Login failed'
-    });
+    return ApiResponse.error('ServerError', err.message || 'Login failed').send(res);
   }
 };
 
@@ -224,7 +165,7 @@ const forgotPassword = async (req, res) => {
   const { phone } = req.body;
   try {
     const user = await User.findOne({ phone });
-    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    if (!user) return ApiResponse.notFound('User not found').send(res);
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     otpStore.set(`reset_${phone}`, { otp, timestamp: Date.now() });
@@ -232,15 +173,9 @@ const forgotPassword = async (req, res) => {
     console.log(`Password reset OTP for ${phone}: ${otp}`);
     // sendOTP(phone, otp); // Uncomment when SMS service is configured
 
-    res.json({
-      success: true,
-      message: 'Password reset OTP sent'
-    });
+    return ApiResponse.success(null, 'Password reset OTP sent').send(res);
   } catch (err) {
-    res.status(500).json({
-      success: false,
-      message: err.message || 'Failed to send reset OTP'
-    });
+    return ApiResponse.error('ServerError', err.message || 'Failed to send reset OTP').send(res);
   }
 };
 
@@ -248,45 +183,30 @@ const resetPassword = async (req, res) => {
   const { phone, otp, password } = req.body;
   try {
     if (!phone || !otp || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Phone, OTP, and password are required'
-      });
+      return ApiResponse.badRequest('Phone, OTP, and password are required').send(res);
     }
 
     const user = await User.findOne({ phone });
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
+      return ApiResponse.notFound('User not found').send(res);
     }
 
     // Verify reset OTP
     const storedOtp = otpStore.get(`reset_${phone}`);
     if (!storedOtp) {
-      return res.status(401).json({
-        success: false,
-        message: 'OTP expired or not found'
-      });
+      return ApiResponse.unauthorized('OTP expired or not found').send(res);
     }
 
     // Check if OTP is expired (5 minutes)
     const isExpired = Date.now() - storedOtp.timestamp > 5 * 60 * 1000;
     if (isExpired) {
       otpStore.delete(`reset_${phone}`);
-      return res.status(401).json({
-        success: false,
-        message: 'OTP expired'
-      });
+      return ApiResponse.unauthorized('OTP expired').send(res);
     }
 
     // Check if OTP matches
     if (storedOtp.otp !== otp) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid OTP'
-      });
+      return ApiResponse.unauthorized('Invalid OTP').send(res);
     }
 
     // Update password and remove OTP
@@ -294,15 +214,9 @@ const resetPassword = async (req, res) => {
     await user.save();
     otpStore.delete(`reset_${phone}`);
 
-    res.json({
-      success: true,
-      message: 'Password reset successful'
-    });
+    return ApiResponse.success(null, 'Password reset successful').send(res);
   } catch (err) {
-    res.status(500).json({
-      success: false,
-      message: err.message || 'Password reset failed'
-    });
+    return ApiResponse.error('ServerError', err.message || 'Password reset failed').send(res);
   }
 };
 

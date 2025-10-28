@@ -3,6 +3,7 @@ const dotenv = require('dotenv');
 const connectDB = require('./config/db');
 const errorHandler = require('./middleware/errorHandler');
 const { getIO } = require('./utils/socket');
+const ApiResponse = require('./utils/responseHelper');
 
 dotenv.config();
 connectDB();
@@ -25,28 +26,27 @@ app.use('/api/common', require('./routes/commonRoutes'));
 
 // Health check endpoint for Render.com
 app.get('/health', (req, res) => {
-  res.status(200).json({
+  const healthData = {
     status: 'OK',
     message: 'Valet Parking Backend is running',
     timestamp: new Date().toISOString(),
     socket: req.io ? 'Socket.io initialized' : 'Socket.io not initialized'
-  });
+  };
+  return ApiResponse.success(healthData, 'Health check successful').send(res);
 });
 
 // Socket.io endpoint for testing
 app.get('/socket-test', (req, res) => {
   const io = req.io;
   if (io) {
-    res.status(200).json({
+    const socketData = {
       status: 'OK',
       message: 'Socket.io is available',
       connectedSockets: Object.keys(io.sockets.sockets).length
-    });
+    };
+    return ApiResponse.success(socketData, 'Socket test successful').send(res);
   } else {
-    res.status(500).json({
-      status: 'ERROR',
-      message: 'Socket.io not initialized'
-    });
+    return ApiResponse.error('ServerError', 'Socket.io not initialized').send(res);
   }
 });
 

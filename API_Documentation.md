@@ -18,7 +18,8 @@ This document provides comprehensive API documentation for the Valet Parking Man
 4. [Driver Operations](#driver-operations)
 5. [Valet Supervisor Operations](#valet-supervisor-operations)
 6. [Parking Location Supervisor Operations](#parking-location-supervisor-operations)
-7. [Error Responses](#error-responses)
+7. [Common Operations](#common-operations)
+8. [Error Responses](#error-responses)
 
 ---
 
@@ -40,6 +41,7 @@ Authorization: Bearer <your_jwt_token>
   "name": "John Doe",
   "phone": "+9999999993",
   "email": "john@example.com",
+  "password": "optional_password",
   "role": "driver",
   "licenseDetails": {
     "licenseNumber": "DL123456789",
@@ -62,7 +64,7 @@ Authorization: Bearer <your_jwt_token>
 }
 ```
 
-**Response (400):**
+**Response (409):**
 ```json
 {
   "success": false,
@@ -136,6 +138,14 @@ Authorization: Bearer <your_jwt_token>
 }
 ```
 
+**Response (403):**
+```json
+{
+  "success": false,
+  "message": "Account pending approval"
+}
+```
+
 ### Login (Legacy)
 
 **POST** `/auth/login`
@@ -143,8 +153,7 @@ Authorization: Bearer <your_jwt_token>
 **Request Body:**
 ```json
 {
-  "phone": "+9999999993",
-  "otp": "123456"
+  "phone": "+9999999993"
 }
 ```
 
@@ -154,6 +163,78 @@ Authorization: Bearer <your_jwt_token>
   "success": true,
   "message": "OTP sent to your phone number",
   "requiresVerification": true
+}
+```
+
+**Response (404):**
+```json
+{
+  "success": false,
+  "message": "User not found. Please register first."
+}
+```
+
+### Forgot Password
+
+**POST** `/auth/forgot-password`
+
+**Request Body:**
+```json
+{
+  "phone": "+9999999993"
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Password reset OTP sent"
+}
+```
+
+**Response (404):**
+```json
+{
+  "success": false,
+  "message": "User not found"
+}
+```
+
+### Reset Password
+
+**POST** `/auth/reset-password`
+
+**Request Body:**
+```json
+{
+  "phone": "+9999999993",
+  "otp": "123456",
+  "password": "new_password"
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Password reset successful"
+}
+```
+
+**Response (400):**
+```json
+{
+  "success": false,
+  "message": "Phone, OTP, and password are required"
+}
+```
+
+**Response (401):**
+```json
+{
+  "success": false,
+  "message": "Invalid OTP"
 }
 ```
 
@@ -712,15 +793,59 @@ Authorization: Bearer <your_jwt_token>
 
 **GET** `/driver/stats`
 
+**Query Parameters:**
+- `dateFrom` (optional): Start date (YYYY-MM-DD)
+- `dateTo` (optional): End date (YYYY-MM-DD)
+
 **Response (200):**
 ```json
 {
   "totalRequests": 50,
   "completedRequests": 48,
-  "pendingRequests": 2,
-  "rating": 4.5,
-  "todayRequests": 5
+  "parkRequests": 30,
+  "pickupRequests": 20,
+  "todayRequests": 5,
+  "completionRate": "96.00",
+  "period": "all_time"
 }
+```
+
+### Get Today Parked Vehicles
+
+**GET** `/driver/today-parked-vehicles`
+
+**Response (200):**
+```json
+[
+  {
+    "_id": "veh_123",
+    "number": "ABC123",
+    "make": "Toyota",
+    "model": "Camry",
+    "ownerName": "John Doe",
+    "status": "parked"
+  }
+]
+```
+
+### Get Parking Locations
+
+**GET** `/driver/parking-locations`
+
+**Response (200):**
+```json
+[
+  {
+    "_id": "location_id",
+    "name": "Downtown Parking",
+    "address": "123 Main St, Downtown",
+    "geolocation": {
+      "lat": 40.7128,
+      "lng": -74.0060
+    },
+    "capacity": 100
+  }
+]
 ```
 
 ---
@@ -739,29 +864,45 @@ Authorization: Bearer <your_jwt_token>
   "licensePlate": "XYZ789",
   "make": "Honda",
   "model": "Civic",
-  "color": "Red"
+  "color": "Red",
+  "locationFrom": {
+    "lat": 40.7128,
+    "lng": -74.0060
+  },
+  "notes": "Optional notes"
 }
 ```
 
 **Response (201):**
 ```json
 {
-  "msg": "Park request created successfully",
-  "parkRequest": {
-    "_id": "park_123",
-    "type": "park",
-    "status": "pending",
-    "vehicleId": "veh_123",
-    "createdAt": "2024-01-15T14:30:00Z"
-  },
-  "vehicle": {
-    "_id": "veh_123",
-    "number": "XYZ789",
-    "make": "Honda",
-    "model": "Civic",
-    "ownerName": "Jane Smith",
-    "status": "in-progress"
+  "success": true,
+  "message": "Park request created successfully",
+  "data": {
+    "request": {
+      "_id": "park_123",
+      "type": "park",
+      "status": "pending",
+      "vehicleId": "veh_123",
+      "createdAt": "2024-01-15T14:30:00Z"
+    },
+    "vehicle": {
+      "_id": "veh_123",
+      "number": "XYZ789",
+      "make": "Honda",
+      "model": "Civic",
+      "ownerName": "Jane Smith",
+      "status": "in-progress"
+    }
   }
+}
+```
+
+**Response (400):**
+```json
+{
+  "success": false,
+  "message": "Park request already exists for this vehicle"
 }
 ```
 
@@ -784,33 +925,65 @@ Authorization: Bearer <your_jwt_token>
 **Response (201):**
 ```json
 {
-  "msg": "Pickup request created successfully",
-  "pickupRequest": {
-    "_id": "pickup_123",
-    "type": "pickup",
-    "status": "pending",
-    "vehicleId": "veh_123",
-    "locationFrom": {
-      "lat": 40.7128,
-      "lng": -74.0060
+  "success": true,
+  "message": "Pickup request created successfully",
+  "data": {
+    "pickupRequest": {
+      "_id": "pickup_123",
+      "type": "pickup",
+      "status": "pending",
+      "vehicleId": "veh_123",
+      "locationFrom": {
+        "lat": 40.7128,
+        "lng": -74.0060
+      },
+      "notes": "Customer requested pickup for their parked vehicle",
+      "createdAt": "2024-01-15T14:30:00Z"
     },
-    "notes": "Customer requested pickup for their parked vehicle",
-    "createdAt": "2024-01-15T14:30:00Z"
-  },
-  "vehicle": {
-    "_id": "veh_123",
-    "number": "ABC123",
-    "make": "Toyota",
-    "model": "Camry",
-    "ownerName": "John Doe",
-    "status": "in-progress"
+    "vehicle": {
+      "_id": "veh_123",
+      "number": "ABC123",
+      "make": "Toyota",
+      "model": "Camry",
+      "ownerName": "John Doe",
+      "status": "in-progress"
+    }
   }
+}
+```
+
+**Response (404):**
+```json
+{
+  "success": false,
+  "message": "Vehicle not found"
+}
+```
+
+**Response (400):**
+```json
+{
+  "success": false,
+  "message": "Vehicle must be parked to create pickup request"
+}
+```
+
+**Response (409):**
+```json
+{
+  "success": false,
+  "message": "Pickup request already exists for this vehicle"
 }
 ```
 
 ### Get Parked Vehicles
 
 **GET** `/supervisor/parked-vehicles`
+
+**Query Parameters:**
+- `dateFrom` (optional): Start date (YYYY-MM-DD)
+- `dateTo` (optional): End date (YYYY-MM-DD)
+- `status` (optional): Filter by vehicle status
 
 **Response (200):**
 ```json
@@ -827,18 +1000,86 @@ Authorization: Bearer <your_jwt_token>
 ]
 ```
 
+### Get Today Parked Vehicles
+
+**GET** `/supervisor/today-parked-vehicles`
+
+**Response (200):**
+```json
+[
+  {
+    "_id": "veh_123",
+    "number": "ABC123",
+    "make": "Toyota",
+    "model": "Camry",
+    "ownerName": "John Doe",
+    "status": "parked",
+    "createdAt": "2024-01-15T10:30:00Z"
+  }
+]
+```
+
+### Get History
+
+**GET** `/supervisor/history`
+
+**Query Parameters:**
+- `dateFrom` (optional): Start date (YYYY-MM-DD)
+- `dateTo` (optional): End date (YYYY-MM-DD)
+- `type` (optional): Filter by request type
+- `action` (optional): Filter by action
+
+**Response (200):**
+```json
+[
+  {
+    "_id": "history_id",
+    "requestId": "request_id",
+    "vehicleId": {
+      "_id": "vehicle_id",
+      "number": "ABC123",
+      "make": "Toyota",
+      "model": "Camry"
+    },
+    "action": "park_request",
+    "details": {
+      "requestType": "park",
+      "carNumber": "ABC123",
+      "ownerName": "John Doe"
+    },
+    "timestamp": "2024-01-15T10:30:00Z",
+    "performedBy": {
+      "_id": "user_id",
+      "name": "Supervisor Name"
+    }
+  }
+]
+```
+
 ### Get Dashboard Statistics
 
 **GET** `/supervisor/dashboard-stats`
 
+**Query Parameters:**
+- `dateFrom` (optional): Start date (YYYY-MM-DD)
+- `dateTo` (optional): End date (YYYY-MM-DD)
+
 **Response (200):**
 ```json
 {
-  "todayRequests": 15,
-  "pendingRequests": 3,
-  "completedRequests": 12,
-  "totalVehicles": 45,
-  "availableDrivers": 8
+  "totalParked": 45,
+  "totalRequests": 100,
+  "totalVerified": 40,
+  "totalSelfParked": 5,
+  "totalSelfPickup": 3,
+  "usersByRole": [
+    { "_id": "driver", "count": 20 },
+    { "_id": "valet_supervisor", "count": 5 }
+  ],
+  "dailyStats": [
+    { "_id": "2024-01-15", "count": 10, "park": 6, "pickup": 4 }
+  ],
+  "period": "all_time"
 }
 ```
 
@@ -853,22 +1094,72 @@ Authorization: Bearer <your_jwt_token>
 **Request Body:**
 ```json
 {
-  "carNumber": "ABC123"
+  "carNumber": "ABC123",
+  "ownerName": "John Doe",
+  "ownerPhone": "+1234567890",
+  "make": "Toyota",
+  "model": "Camry",
+  "color": "Blue",
+  "locationFrom": {
+    "lat": 40.7128,
+    "lng": -74.0060
+  }
 }
 ```
 
 **Response (200):**
 ```json
 {
-  "msg": "Park request verified",
-  "vehicle": {
-    "_id": "veh_123",
-    "number": "ABC123",
-    "make": "Toyota",
-    "model": "Camry",
-    "ownerName": "John Doe",
-    "isVerified": true
+  "success": true,
+  "message": "Vehicle verified successfully",
+  "data": {
+    "request": {
+      "_id": "req_123",
+      "status": "verified",
+      "verificationTime": "2024-01-15T10:30:00Z"
+    },
+    "vehicle": {
+      "_id": "veh_123",
+      "number": "ABC123",
+      "make": "Toyota",
+      "model": "Camry",
+      "ownerName": "John Doe",
+      "isVerified": true,
+      "verifiedAt": "2024-01-15T10:30:00Z"
+    }
   }
+}
+```
+
+**Response (201):**
+```json
+{
+  "success": true,
+  "message": "Self-parked request created for existing vehicle",
+  "data": {
+    "request": {
+      "_id": "req_123",
+      "type": "park",
+      "status": "verified",
+      "isSelfParked": true
+    },
+    "vehicle": {
+      "_id": "veh_123",
+      "number": "ABC123",
+      "make": "Toyota",
+      "model": "Camry",
+      "ownerName": "John Doe",
+      "isVerified": true
+    }
+  }
+}
+```
+
+**Response (409):**
+```json
+{
+  "success": false,
+  "message": "Vehicle with this car number already exists in the system"
 }
 ```
 
@@ -879,11 +1170,84 @@ Authorization: Bearer <your_jwt_token>
 **Response (200):**
 ```json
 {
-  "msg": "Vehicle marked for self pickup",
-  "vehicle": {
-    "_id": "veh_123",
-    "status": "available"
+  "success": true,
+  "message": "Self-pickup marked successfully",
+  "data": {
+    "request": {
+      "_id": "req_123",
+      "status": "self_pickup",
+      "handoverTime": "2024-01-15T10:30:00Z",
+      "isSelfPickup": true
+    },
+    "vehicle": {
+      "_id": "veh_123",
+      "status": "available"
+    }
   }
+}
+```
+
+**Response (404):**
+```json
+{
+  "success": false,
+  "message": "Vehicle not found"
+}
+```
+
+---
+
+## Common Operations
+
+### Get Parking Locations
+
+**GET** `/parking-locations`
+
+**Response (200):**
+```json
+[
+  {
+    "_id": "location_id",
+    "name": "Downtown Parking",
+    "address": "123 Main St, Downtown",
+    "geolocation": {
+      "lat": 40.7128,
+      "lng": -74.0060
+    },
+    "capacity": 100,
+    "createdAt": "2024-01-15T10:30:00Z"
+  }
+]
+```
+
+### Search Vehicles
+
+**GET** `/vehicles/search?q=search_term`
+
+**Query Parameters:**
+- `q` (required): Search query (minimum 3 characters)
+
+**Response (200):**
+```json
+[
+  {
+    "_id": "veh_123",
+    "ownerName": "John Doe",
+    "ownerPhone": "+1234567890",
+    "make": "Toyota",
+    "model": "Camry",
+    "number": "ABC123",
+    "color": "Blue",
+    "status": "parked"
+  }
+]
+```
+
+**Response (400):**
+```json
+{
+  "success": false,
+  "message": "Search query is required and must be at least 3 characters long"
 }
 ```
 
@@ -916,6 +1280,21 @@ Authorization: Bearer <your_jwt_token>
 - `"Invalid OTP"` - Wrong OTP provided
 - `"OTP expired or not found"` - OTP expired or doesn't exist
 - `"Phone number and OTP are required"` - Missing required fields
+- `"Phone, OTP, and password are required"` - Missing required fields for password reset
+- `"Request no longer available"` - Request was taken by another driver
+- `"Unauthorized to complete this request"` - Driver doesn't own the request
+- `"This is not a park request"` - Wrong request type for park operation
+- `"This is not a pickup request"` - Wrong request type for pickup operation
+- `"Vehicle not found"` - Vehicle doesn't exist in system
+- `"Vehicle must be parked to create pickup request"` - Invalid state for pickup
+- `"Pickup request already exists for this vehicle"` - Duplicate pickup request
+- `"Park request already exists for this vehicle"` - Duplicate park request
+- `"No verified request found for this vehicle"` - Vehicle not verified for pickup
+- `"Search query is required and must be at least 3 characters long"` - Invalid search
+- `"Email ${email} is already registered to another user"` - Duplicate email
+- `"${field} \"${value}\" is already registered to another user"` - Duplicate field value
+- `"Vehicle with this car number already exists in the system"` - Duplicate vehicle
+- `"Self-parked vehicle with this car number already exists"` - Duplicate self-parked
 
 ---
 
@@ -927,6 +1306,10 @@ Authorization: Bearer <your_jwt_token>
 4. **Pagination**: Use `page` and `limit` query parameters for paginated responses
 5. **File Exports**: Use `format=csv` parameter for CSV exports, otherwise JSON format
 6. **Search**: Use `searchBy` and `searchValue` for filtering history records
+7. **Role-based Access**: Different endpoints require specific user roles (admin, driver, valet_supervisor, parking_location_supervisor)
+8. **Real-time Updates**: The system uses Socket.IO for real-time notifications and updates
+9. **Atomic Operations**: Request acceptance uses atomic operations to prevent race conditions
+10. **Vehicle Status Flow**: available → in-progress → parked (for park requests) or available → in-progress → available (for pickup requests)
 
 ---
 
@@ -941,6 +1324,73 @@ Authorization: Bearer <your_jwt_token>
 2. **Default OTP**: `123456` (for development only)
 
 3. **SMS Integration**: Uncomment SMS sending code in controllers when SMS service is configured
+
+4. **Socket.IO Integration**: Real-time features require Socket.IO server setup
+
+---
+
+## API Response Format
+
+All API responses follow a consistent format:
+
+### Success Response
+```json
+{
+  "success": true,
+  "message": "Operation completed successfully",
+  "data": { ... } // Response data (optional)
+}
+```
+
+### Error Response
+```json
+{
+  "success": false,
+  "message": "Error description"
+}
+```
+
+### Legacy Response Format (Admin endpoints)
+```json
+{
+  "msg": "Operation completed successfully",
+  "user": { ... } // Response data
+}
+```
+
+---
+
+## Real-time Features
+
+The API supports real-time updates through Socket.IO:
+
+### Events Emitted:
+- `new-park-request` - When a new park request is created
+- `new-pickup-request` - When a new pickup request is created
+- `request-accepted` - When a driver accepts a request
+- `park-completed` - When a vehicle is marked as parked
+- `pickup-completed` - When a vehicle handover is completed
+- `vehicle-verified` - When a vehicle is verified
+- `self-parked-created` - When a self-parked vehicle is created
+- `self-pickup-marked` - When a self-pickup is marked
+
+---
+
+## Rate Limiting
+
+- OTP requests are limited to prevent abuse
+- Request acceptance uses atomic operations to prevent race conditions
+- Search queries require minimum 3 characters
+
+---
+
+## Data Validation
+
+- Phone numbers must include country code (e.g., +1234567890)
+- License plate numbers must be unique
+- Email addresses must be unique (when provided)
+- Vehicle make and model are required fields
+- Rating values must be between 1-5
 
 ---
 

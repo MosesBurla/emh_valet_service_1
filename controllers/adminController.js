@@ -5,6 +5,7 @@ const Vehicle = require('../models/Vehicle');
 const History = require('../models/History');
 const Feedback = require('../models/Feedback');
 const notifier = require('../utils/notifier');
+const ApiResponse = require('../utils/responseHelper');
 
 const getPendingRegistrations = async (req, res) => {
   try {
@@ -23,9 +24,9 @@ const getPendingRegistrations = async (req, res) => {
       .select('-password')
       .sort({ createdAt: -1 });
 
-    res.json(pendings);
+    return ApiResponse.success(pendings, 'Pending registrations retrieved successfully').send(res);
   } catch (err) {
-    res.status(500).json({ msg: err.message });
+    return ApiResponse.error('ServerError', err.message).send(res);
   }
 };
 
@@ -33,7 +34,7 @@ const approveUser = async (req, res) => {
   const { role } = req.body;
   try {
     const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ msg: 'User not found' });
+    if (!user) return ApiResponse.notFound('User not found').send(res);
 
     user.status = 'approved';
     if (role && ['driver', 'valet_supervisor', 'parking_location_supervisor'].includes(role)) {
@@ -43,31 +44,31 @@ const approveUser = async (req, res) => {
 
     // Send notification
     notifier.notifyUser(user.phone, `Your registration is approved! You are now registered as ${user.role.replace('_', ' ')}.`);
-    res.json({ msg: 'User approved successfully', user });
+    return ApiResponse.success({ user }, 'User approved successfully').send(res);
   } catch (err) {
-    res.status(500).json({ msg: err.message });
+    return ApiResponse.error('ServerError', err.message).send(res);
   }
 };
 
 const rejectUser = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ msg: 'User not found' });
+    if (!user) return ApiResponse.notFound('User not found').send(res);
 
     const userData = { ...user.toObject() };
     await User.findByIdAndDelete(req.params.id);
 
     notifier.notifyUser(user.phone, 'Your registration was rejected. Please contact support if you have questions.');
-    res.json({ msg: 'User rejected successfully' });
+    return ApiResponse.success(null, 'User rejected successfully').send(res);
   } catch (err) {
-    res.status(500).json({ msg: err.message });
+    return ApiResponse.error('ServerError', err.message).send(res);
   }
 };
 
 const editUser = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ msg: 'User not found' });
+    if (!user) return ApiResponse.notFound('User not found').send(res);
 
     const allowedFields = ['name', 'email'];
     const updates = {};
@@ -96,26 +97,22 @@ const editUser = async (req, res) => {
       });
 
       if (existingUser) {
-        return res.status(400).json({
-          msg: `Email ${updates.email} is already registered to another user`
-        });
+        return ApiResponse.conflict(`Email ${updates.email} is already registered to another user`).send(res);
       }
     }
 
     const updatedUser = await User.findByIdAndUpdate(req.params.id, updates, { new: true });
-    if (!updatedUser) return res.status(404).json({ msg: 'User not found' });
+    if (!updatedUser) return ApiResponse.notFound('User not found').send(res);
 
-    res.json(updatedUser);
+    return ApiResponse.success(updatedUser, 'User updated successfully').send(res);
   } catch (err) {
     // Handle duplicate key errors with better error messages
     if (err.code === 11000) {
       const field = Object.keys(err.keyValue)[0];
       const value = err.keyValue[field];
-      return res.status(400).json({
-        msg: `${field} "${value}" is already registered to another user`
-      });
+      return ApiResponse.conflict(`${field} "${value}" is already registered to another user`).send(res);
     }
-    res.status(500).json({ msg: err.message });
+    return ApiResponse.error('ServerError', err.message).send(res);
   }
 };
 
@@ -124,29 +121,29 @@ const addParkingLocation = async (req, res) => {
   try {
     const location = new ParkingLocation({ name, address, geolocation, capacity });
     await location.save();
-    res.status(201).json(location);
+    return ApiResponse.created(location, 'Parking location added successfully').send(res);
   } catch (err) {
-    res.status(500).json({ msg: err.message });
+    return ApiResponse.error('ServerError', err.message).send(res);
   }
 };
 
 const editParkingLocation = async (req, res) => {
   try {
     const location = await ParkingLocation.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!location) return res.status(404).json({ msg: 'Location not found' });
-    res.json(location);
+    if (!location) return ApiResponse.notFound('Location not found').send(res);
+    return ApiResponse.success(location, 'Parking location updated successfully').send(res);
   } catch (err) {
-    res.status(500).json({ msg: err.message });
+    return ApiResponse.error('ServerError', err.message).send(res);
   }
 };
 
 const deleteParkingLocation = async (req, res) => {
   try {
     const location = await ParkingLocation.findByIdAndDelete(req.params.id);
-    if (!location) return res.status(404).json({ msg: 'Location not found' });
-    res.json({ msg: 'Location deleted' });
+    if (!location) return ApiResponse.notFound('Location not found').send(res);
+    return ApiResponse.success(null, 'Location deleted successfully').send(res);
   } catch (err) {
-    res.status(500).json({ msg: err.message });
+    return ApiResponse.error('ServerError', err.message).send(res);
   }
 };
 
@@ -241,7 +238,7 @@ const getStatistics = async (req, res) => {
       }
     ]);
 
-    res.json({
+    const statsData = {
       overview: {
         totalUsers,
         totalRequests,
@@ -256,9 +253,11 @@ const getStatistics = async (req, res) => {
       dailyStats,
       feedbackStats: feedbackStats[0] || { avgRating: 0, totalFeedback: 0 },
       period: dateFrom && dateTo ? { from: dateFrom, to: dateTo } : 'all_time'
-    });
+    };
+
+    return ApiResponse.success(statsData, 'Statistics retrieved successfully').send(res);
   } catch (err) {
-    res.status(500).json({ msg: err.message });
+    return ApiResponse.error('ServerError', err.message).send(res);
   }
 };
 
@@ -375,7 +374,7 @@ const getComprehensiveHistory = async (req, res) => {
         }
       ]);
 
-      res.json({
+      const historyData = {
         history,
         pagination: {
           currentPage: parseInt(page),
@@ -383,7 +382,9 @@ const getComprehensiveHistory = async (req, res) => {
           total: totalCount[0]?.total || 0,
           pages: Math.ceil((totalCount[0]?.total || 0) / parseInt(limit))
         }
-      });
+      };
+
+      return ApiResponse.success(historyData, 'Comprehensive history retrieved successfully').send(res);
     } else {
       // Regular query without driver search
       const history = await History.find(filter)
@@ -394,7 +395,7 @@ const getComprehensiveHistory = async (req, res) => {
 
       const totalCount = await History.countDocuments(filter);
 
-      res.json({
+      const historyData = {
         history,
         pagination: {
           currentPage: parseInt(page),
@@ -402,10 +403,12 @@ const getComprehensiveHistory = async (req, res) => {
           total: totalCount,
           pages: Math.ceil(totalCount / parseInt(limit))
         }
-      });
+      };
+
+      return ApiResponse.success(historyData, 'Comprehensive history retrieved successfully').send(res);
     }
   } catch (err) {
-    res.status(500).json({ msg: err.message });
+    return ApiResponse.error('ServerError', err.message).send(res);
   }
 };
 
@@ -458,16 +461,16 @@ const exportHistory = async (req, res) => {
       res.json(history);
     }
   } catch (err) {
-    res.status(500).json({ msg: err.message });
+    return ApiResponse.error('ServerError', err.message).send(res);
   }
 };
 
 const getParkingLocations = async (req, res) => {
   try {
     const locations = await ParkingLocation.find();
-    res.json(locations);
+    return ApiResponse.success(locations, 'Parking locations retrieved successfully').send(res);
   } catch (err) {
-    res.status(500).json({ msg: err.message });
+    return ApiResponse.error('ServerError', err.message).send(res);
   }
 };
 
@@ -482,9 +485,9 @@ const getAllUsers = async (req, res) => {
       .select('-password')
       .sort({ createdAt: -1 });
 
-    res.json(users);
+    return ApiResponse.success(users, 'Users retrieved successfully').send(res);
   } catch (err) {
-    res.status(500).json({ msg: err.message });
+    return ApiResponse.error('ServerError', err.message).send(res);
   }
 };
 
@@ -498,15 +501,17 @@ const getSystemHealth = async (req, res) => {
     const activeRequests = await Request.countDocuments({ status: { $in: ['pending', 'accepted'] } });
     const totalRequests = await Request.countDocuments();
 
-    res.json({
+    const healthData = {
       users: { total: totalUsers, active: activeUsers, pending: pendingUsers },
       vehicles: { total: totalVehicles, parked: parkedVehicles },
       requests: { total: totalRequests, active: activeRequests },
       systemStatus: 'healthy',
       timestamp: new Date()
-    });
+    };
+
+    return ApiResponse.success(healthData, 'System health retrieved successfully').send(res);
   } catch (err) {
-    res.status(500).json({ msg: err.message });
+    return ApiResponse.error('ServerError', err.message).send(res);
   }
 };
 
