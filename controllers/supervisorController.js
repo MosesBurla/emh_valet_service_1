@@ -123,8 +123,8 @@ const createParkRequest = async (req, res) => {
     const existingRequest = await Request.findOne({
       vehicleId: vehicle._id,
       type: 'park',
-      status: { $in: ['pending', 'accepted'] }
-    });
+      status: { $in: ['pending', 'accepted','completed', 'verified'] }
+    });ß
 
     if (existingRequest) {
       return ApiResponse.badRequest(null, 'Park request already exists for this vehicle').send(res);
@@ -431,6 +431,17 @@ const getHistory = async (req, res) => {
     const { dateFrom, dateTo, type, action } = req.query;
 
     let filter = {};
+
+    // Add role-based filtering
+    if (req.user.role === 'valet_supervisor') {
+      // Valet supervisors see created history: park_request, pickup_request_created
+      filter.action = { $in: ['park_request', 'pickup_request_created'] };
+    } else if (req.user.role === 'parking_location_supervisor') {
+      // Parking location supervisors see verified history
+      filter.action = 'verified';
+    }
+    // Admins see all (no additional filter needed)
+
     if (dateFrom || dateTo) {
       filter.timestamp = {};
       if (dateFrom) filter.timestamp.$gte = new Date(dateFrom);

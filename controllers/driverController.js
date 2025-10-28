@@ -65,6 +65,10 @@ const acceptRequest = async (req, res) => {
     const vehicle = await Vehicle.findById(updatedRequest.vehicleId);
     if (vehicle) {
       vehicle.status = 'in-progress';
+      // Remove verification details once accepted
+      vehicle.isVerified = false;
+      vehicle.verifiedBy = undefined;
+      vehicle.verifiedAt = undefined;
       await vehicle.save();
     }
 
@@ -125,6 +129,10 @@ const markParked = async (req, res) => {
     const vehicle = await Vehicle.findById(request.vehicleId);
     if (vehicle) {
       vehicle.status = 'parked';
+      // Remove verification details after completion
+      vehicle.isVerified = false;
+      vehicle.verifiedBy = undefined;
+      vehicle.verifiedAt = undefined;
       await vehicle.save();
     }
 
@@ -186,6 +194,10 @@ const markHandedOver = async (req, res) => {
     const vehicle = await Vehicle.findById(request.vehicleId);
     if (vehicle) {
       vehicle.status = 'available';
+      // Remove verification details after handover
+      vehicle.isVerified = false;
+      vehicle.verifiedBy = undefined;
+      vehicle.verifiedAt = undefined;
       await vehicle.save();
     }
 
@@ -219,19 +231,22 @@ const getHistory = async (req, res) => {
   try {
     const { dateFrom, dateTo, type } = req.query;
 
-    let filter = { driverId: req.user.id };
+    let filter = {
+      performedBy: req.user.id,
+      action: { $in: ['completed', 'handed_over'] } // Drivers see completed and handed over history
+    };
 
     if (dateFrom || dateTo) {
-      filter.createdAt = {};
-      if (dateFrom) filter.createdAt.$gte = new Date(dateFrom);
-      if (dateTo) filter.createdAt.$lte = new Date(dateTo);
+      filter.timestamp = {};
+      if (dateFrom) filter.timestamp.$gte = new Date(dateFrom);
+      if (dateTo) filter.timestamp.$lte = new Date(dateTo);
     }
 
-    if (type) filter.type = type;
+    if (type) filter['details.requestType'] = type;
 
-    const history = await Request.find(filter)
-      .populate('vehicleId createdBy')
-      .sort({ createdAt: -1 });
+    const history = await History.find(filter)
+      .populate('vehicleId performedBy')
+      .sort({ timestamp: -1 });
 
     return ApiResponse.success(history, 'Driver history retrieved successfully').send(res);
   } catch (err) {
