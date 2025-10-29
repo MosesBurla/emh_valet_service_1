@@ -124,7 +124,7 @@ const createParkRequest = async (req, res) => {
       vehicleId: vehicle._id,
       type: 'park',
       status: { $in: ['pending', 'accepted','completed', 'verified'] }
-    });ß
+    });
 
     if (existingRequest) {
       return ApiResponse.badRequest(null, 'Park request already exists for this vehicle').send(res);
@@ -551,3 +551,4 @@ module.exports = {
   getHistory,
   getDashboardStats
 };
+
