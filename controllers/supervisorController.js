@@ -301,7 +301,7 @@ const verifyParkRequest = async (req, res) => {
         vehicleId: selfParkedVehicle._id,
         createdBy: req.user.id,
         type: 'park',
-        status: 'self_parked',
+        status: 'verified',
         isSelfParked: true,
         locationFrom: req.body.locationFrom,
         notes: 'Self-parked vehicle'
@@ -551,4 +551,5 @@ module.exports = {
   getHistory,
   getDashboardStats
 };
+
 
