@@ -8,7 +8,7 @@ const requestSchema = new mongoose.Schema({
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   type: { type: String, enum: ['park', 'pickup'], required: true },
   status: { type: String, enum: ['pending', 'accepted', 'completed', 'verified', 'handed_over', 'self_parked', 'self_pickup'], default: 'pending' },
-  locationFrom: { lat: Number, lng: Number },
+  locationFrom: { latitude: Number, longitude: Number },
   locationTo: { lat: Number, lng: Number },
   completionTime: { type: Date },
   handoverTime: { type: Date },
