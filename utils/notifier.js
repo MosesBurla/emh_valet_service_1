@@ -71,6 +71,14 @@ const sendRequestNotification = async (request, type = 'new_request') => {
     const User = require('../models/User');
     const { sendFCMNotification } = require('./fcm');
 
+    // Populate vehicle data if not already populated
+    let populatedRequest = request;
+    if (!request.vehicle && request.vehicleId) {
+      const Request = require('../models/Request');
+      populatedRequest = await Request.findById(request._id).populate('vehicleId');
+      populatedRequest.vehicle = populatedRequest.vehicleId;
+    }
+
     const notificationData = {
       type,
       requestId: request._id.toString(),
@@ -79,10 +87,10 @@ const sendRequestNotification = async (request, type = 'new_request') => {
       requestCreatedAt: request.createdAt.toISOString(),
       requestLocationFrom: request.locationFrom || '',
       requestNotes: request.notes || '',
-      vehicleNumber: request.vehicle?.number || '',
-      vehicleMake: request.vehicle?.make || '',
-      vehicleModel: request.vehicle?.model || '',
-      vehicleOwnerName: request.vehicle?.ownerName || '',
+      vehicleNumber: populatedRequest.vehicle?.number || '',
+      vehicleMake: populatedRequest.vehicle?.make || '',
+      vehicleModel: populatedRequest.vehicle?.model || '',
+      vehicleOwnerName: populatedRequest.vehicle?.ownerName || '',
       timestamp: new Date().toISOString()
     };
 
@@ -103,8 +111,8 @@ const sendRequestNotification = async (request, type = 'new_request') => {
     if (drivers.length > 0) {
       const title = type === 'new_request' ? 'New Park Request' : 'New Pickup Request';
       const body = type === 'new_request'
-        ? `Park request for vehicle ${request.vehicle?.number || 'Unknown'}`
-        : `Pickup request for vehicle ${request.vehicle?.number || 'Unknown'}`;
+        ? `Park request for vehicle ${populatedRequest.vehicle?.number || 'Unknown'}`
+        : `Pickup request for vehicle ${populatedRequest.vehicle?.number || 'Unknown'}`;
 
       // Send FCM notification to each driver/supervisor
       for (const driver of drivers) {
