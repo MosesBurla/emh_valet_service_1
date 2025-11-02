@@ -4,9 +4,26 @@ const connectDB = require('./config/db');
 const errorHandler = require('./middleware/errorHandler');
 const { getIO } = require('./utils/socket');
 const ApiResponse = require('./utils/responseHelper');
+const { generateAndStoreAccessToken } = require('./utils/fcm');
+const cron = require('node-cron');
 
 dotenv.config();
 connectDB();
+
+// Initialize Firebase Admin SDK (already done in utils/fcm.js)
+
+// Generate initial FCM access token
+generateAndStoreAccessToken().catch(console.error);
+
+// Set up cron job to refresh FCM access token every 55 minutes
+cron.schedule('*/55 * * * *', async () => {
+  console.log('Refreshing FCM access token...');
+  try {
+    await generateAndStoreAccessToken();
+  } catch (error) {
+    console.error('Error refreshing FCM access token:', error);
+  }
+});
 
 const app = express();
 

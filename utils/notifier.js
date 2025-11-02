@@ -33,15 +33,26 @@ const broadcastToRole = (role, event, data) => {
 
 const sendPushNotification = async (userId, title, body, data = {}) => {
   try {
-    // Here you would integrate with push notification services like:
-    // - Firebase Cloud Messaging (FCM)
-    // - Apple Push Notification Service (APNS)
-    // - OneSignal
-    // - Pusher
+    const User = require('../models/User');
+    const { sendFCMNotification } = require('./fcm');
 
-    console.log(`Push notification to user ${userId}: ${title} - ${body}`);
+    const user = await User.findById(userId);
+    if (!user || !user.fcmToken) {
+      console.log(`User ${userId} does not have FCM token or not found`);
+      // Send real-time notification as fallback
+      sendRealTimeNotification(userId, 'push_notification', {
+        title,
+        body,
+        data,
+        timestamp: new Date()
+      });
+      return;
+    }
 
-    // For now, also send real-time notification as fallback
+    // Send FCM notification
+    await sendFCMNotification(user.fcmToken, title, body, data);
+
+    // Also send real-time notification
     sendRealTimeNotification(userId, 'push_notification', {
       title,
       body,
@@ -54,9 +65,11 @@ const sendPushNotification = async (userId, title, body, data = {}) => {
   }
 };
 
-const sendRequestNotification = (request, type = 'new_request') => {
+const sendRequestNotification = async (request, type = 'new_request') => {
   try {
     const { getIO } = require('./socket');
+    const User = require('../models/User');
+    const { sendFCMNotification } = require('./fcm');
 
     const notificationData = {
       type,
@@ -77,11 +90,35 @@ const sendRequestNotification = (request, type = 'new_request') => {
       timestamp: new Date()
     };
 
-    // Broadcast to all drivers for new requests
+    // Broadcast to all drivers/supervisors via socket
     if (type === 'new_request') {
       getIO().emit('new-request', notificationData);
     } else if (type === 'new_pickup_request') {
       getIO().emit('new-pickup-request', notificationData);
+    }
+
+    // Send push notifications to drivers and supervisors
+    const drivers = await User.find({
+      role: { $in: ['driver', 'valet_supervisor', 'parking_location_supervisor'] },
+      status: 'approved',
+      fcmToken: { $exists: true, $ne: null }
+    });
+
+    if (drivers.length > 0) {
+      const title = type === 'new_request' ? 'New Park Request' : 'New Pickup Request';
+      const body = type === 'new_request'
+        ? `Park request for vehicle ${request.vehicle?.number || 'Unknown'}`
+        : `Pickup request for vehicle ${request.vehicle?.number || 'Unknown'}`;
+
+      // Send FCM notification to each driver/supervisor
+      for (const driver of drivers) {
+        try {
+          await sendFCMNotification(driver.fcmToken, title, body, notificationData);
+          console.log(`FCM notification sent to ${driver.name} (${driver.role})`);
+        } catch (notificationError) {
+          console.error(`Error sending FCM notification to ${driver.name}:`, notificationError);
+        }
+      }
     }
 
     console.log(`Request notification sent: ${type} for request ${request._id}`);

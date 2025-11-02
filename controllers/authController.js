@@ -67,7 +67,7 @@ const sendOtp = async (req, res) => {
 };
 
 const verifyOtp = async (req, res) => {
-  const { phone, otp } = req.body;
+  const { phone, otp, fcmToken } = req.body;
   try {
     if (!phone || !otp) {
       return ApiResponse.badRequest('Phone number and OTP are required').send(res);
@@ -104,6 +104,12 @@ const verifyOtp = async (req, res) => {
 
     // OTP verified successfully, remove from store
     otpStore.delete(phone);
+
+    // Store FCM token if provided
+    if (fcmToken) {
+      user.fcmToken = fcmToken;
+      await user.save();
+    }
 
     // Generate JWT token
     const token = jwt.sign(

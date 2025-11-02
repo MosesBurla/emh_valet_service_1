@@ -87,3 +87,6 @@ Thumbs.db
 # Build outputs
 dist/
 build/
+
+# Firebase Service Account Credentials
+*-firebase-adminsdk-*.json

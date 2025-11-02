@@ -7,6 +7,7 @@ const userSchema = new mongoose.Schema({
   email: { type: String, unique: true, sparse: true },
   photoUrl: { type: String },
   password: { type: String, required: false },
+  fcmToken: { type: String }, // Firebase Cloud Messaging device token
   role: { type: String, enum: ['admin', 'driver', 'valet_supervisor', 'parking_location_supervisor'], required: true },
   status: { type: String, enum: ['pending', 'approved'], default: 'pending' },
   licenseDetails: { type: Object },

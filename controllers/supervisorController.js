@@ -162,6 +162,10 @@ const createParkRequest = async (req, res) => {
     });
     await history.save();
 
+    // Send notification to all drivers
+    const { sendRequestNotification } = require('../utils/notifier');
+    sendRequestNotification(request, 'new_request');
+
     // Broadcast to all drivers at valet location
     getIO().emit('new-park-request', {
       request,
@@ -551,5 +555,3 @@ module.exports = {
   getHistory,
   getDashboardStats
 };
-
-
