@@ -87,7 +87,7 @@ const getCurrentAccessToken = async () => {
 /**
  * Send FCM notification to a single device
  */
-const sendFCMNotification = async (token, title, body, data = {}) => {
+const sendFCMNotification = async (token, title, body) => {
   try {
     if (!serviceAccount) {
       console.warn('Firebase not initialized - FCM notifications unavailable');
@@ -99,8 +99,7 @@ const sendFCMNotification = async (token, title, body, data = {}) => {
       notification: {
         title: title,
         body: body
-      },
-      data: data
+      }
     };
 
     const response = await admin.messaging().send(message);
@@ -115,7 +114,7 @@ const sendFCMNotification = async (token, title, body, data = {}) => {
 /**
  * Send FCM notification to multiple devices
  */
-const sendBulkFCMNotifications = async (tokens, title, body, data = {}) => {
+const sendBulkFCMNotifications = async (tokens, title, body) => {
   try {
     if (!serviceAccount) {
       console.warn('Firebase not initialized - FCM bulk notifications unavailable');
@@ -127,8 +126,7 @@ const sendBulkFCMNotifications = async (tokens, title, body, data = {}) => {
       notification: {
         title: title,
         body: body
-      },
-      data: data
+      }
     }));
 
     const response = await admin.messaging().sendAll(messages);

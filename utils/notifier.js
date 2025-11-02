@@ -49,8 +49,8 @@ const sendPushNotification = async (userId, title, body, data = {}) => {
       return;
     }
 
-    // Send FCM notification
-    await sendFCMNotification(user.fcmToken, title, body, data);
+    // Send FCM notification (only notification, no data payload)
+    await sendFCMNotification(user.fcmToken, title, body);
 
     // Also send real-time notification
     sendRealTimeNotification(userId, 'push_notification', {
@@ -73,21 +73,17 @@ const sendRequestNotification = async (request, type = 'new_request') => {
 
     const notificationData = {
       type,
-      request: {
-        id: request._id,
-        type: request.type,
-        status: request.status,
-        createdAt: request.createdAt,
-        locationFrom: request.locationFrom,
-        notes: request.notes
-      },
-      vehicle: request.vehicle ? {
-        number: request.vehicle.number,
-        make: request.vehicle.make,
-        model: request.vehicle.model,
-        ownerName: request.vehicle.ownerName
-      } : null,
-      timestamp: new Date()
+      requestId: request._id.toString(),
+      requestType: request.type,
+      requestStatus: request.status,
+      requestCreatedAt: request.createdAt.toISOString(),
+      requestLocationFrom: request.locationFrom || '',
+      requestNotes: request.notes || '',
+      vehicleNumber: request.vehicle?.number || '',
+      vehicleMake: request.vehicle?.make || '',
+      vehicleModel: request.vehicle?.model || '',
+      vehicleOwnerName: request.vehicle?.ownerName || '',
+      timestamp: new Date().toISOString()
     };
 
     // Broadcast to all drivers/supervisors via socket
@@ -113,7 +109,7 @@ const sendRequestNotification = async (request, type = 'new_request') => {
       // Send FCM notification to each driver/supervisor
       for (const driver of drivers) {
         try {
-          await sendFCMNotification(driver.fcmToken, title, body, notificationData);
+          await sendFCMNotification(driver.fcmToken, title, body);
           console.log(`FCM notification sent to ${driver.name} (${driver.role})`);
         } catch (notificationError) {
           console.error(`Error sending FCM notification to ${driver.name}:`, notificationError);
